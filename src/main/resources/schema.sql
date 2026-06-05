@@ -8,3 +8,10 @@ CREATE TABLE IF NOT EXISTS transaction_records (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    idempotency_key VARCHAR(255) PRIMARY KEY,
+    response_body TEXT NOT NULL,
+    merchant_id VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
