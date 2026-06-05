@@ -2,9 +2,11 @@ com\paymentgateway\entity\TransactionRecord$TransactionRecordBuilder.class
 com\paymentgateway\PaymentGatewayApplication.class
 com\paymentgateway\entity\TransactionRecord.class
 com\paymentgateway\entity\IdempotencyRecord.class
+com\paymentgateway\exception\PaymentProcessingException.class
 com\paymentgateway\entity\TransactionStatus.class
 com\paymentgateway\entity\IdempotencyRecord$IdempotencyRecordBuilder.class
 com\paymentgateway\repository\IdempotencyRecordRepository.class
+com\paymentgateway\strategy\PaymentProcessorStrategy.class
 com\paymentgateway\dto\PaymentRequestDto.class
 com\paymentgateway\dto\CardDetailsDto$CardDetailsDtoBuilder.class
 com\paymentgateway\dto\CardDetailsDto.class
