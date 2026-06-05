@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -30,7 +31,8 @@ public class StripePaymentAdapter implements PaymentProcessorStrategy {
     private final WebClient stripeWebClient;
     private final TransactionRecordRepository transactionRecordRepository;
 
-    public StripePaymentAdapter(WebClient stripeWebClient, TransactionRecordRepository transactionRecordRepository) {
+    public StripePaymentAdapter(@Qualifier("stripeWebClient") WebClient stripeWebClient,
+            TransactionRecordRepository transactionRecordRepository) {
         this.stripeWebClient = stripeWebClient;
         this.transactionRecordRepository = transactionRecordRepository;
     }

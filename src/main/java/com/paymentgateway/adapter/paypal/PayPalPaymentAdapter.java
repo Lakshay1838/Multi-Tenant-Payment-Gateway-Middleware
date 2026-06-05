@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -30,7 +31,8 @@ public class PayPalPaymentAdapter implements PaymentProcessorStrategy {
     private final WebClient paypalWebClient;
     private final TransactionRecordRepository transactionRecordRepository;
 
-    public PayPalPaymentAdapter(WebClient paypalWebClient, TransactionRecordRepository transactionRecordRepository) {
+    public PayPalPaymentAdapter(@Qualifier("paypalWebClient") WebClient paypalWebClient,
+            TransactionRecordRepository transactionRecordRepository) {
         this.paypalWebClient = paypalWebClient;
         this.transactionRecordRepository = transactionRecordRepository;
     }
