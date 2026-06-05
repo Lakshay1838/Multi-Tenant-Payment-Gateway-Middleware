@@ -1,0 +1,54 @@
+# Maven / Java build output
+/target/
+/build/
+/out/
+
+# Compiled class files
+*.class
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Eclipse / STS
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+.nb-gradle/
+
+# VS Code Java workspace
+*.factorypath
+
+# Maven wrapper temp files
+.mvn/wrapper/maven-wrapper.jar
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Java crash logs
+hs_err_pid*
+replay_pid*
