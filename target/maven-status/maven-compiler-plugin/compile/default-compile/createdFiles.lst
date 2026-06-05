@@ -5,4 +5,10 @@ com\paymentgateway\entity\IdempotencyRecord.class
 com\paymentgateway\entity\TransactionStatus.class
 com\paymentgateway\entity\IdempotencyRecord$IdempotencyRecordBuilder.class
 com\paymentgateway\repository\IdempotencyRecordRepository.class
+com\paymentgateway\dto\PaymentRequestDto.class
+com\paymentgateway\dto\CardDetailsDto$CardDetailsDtoBuilder.class
+com\paymentgateway\dto\CardDetailsDto.class
+com\paymentgateway\dto\PaymentRequestDto$PaymentRequestDtoBuilder.class
 com\paymentgateway\repository\TransactionRecordRepository.class
+com\paymentgateway\dto\GatewayResponseDto.class
+com\paymentgateway\dto\GatewayResponseDto$GatewayResponseDtoBuilder.class
