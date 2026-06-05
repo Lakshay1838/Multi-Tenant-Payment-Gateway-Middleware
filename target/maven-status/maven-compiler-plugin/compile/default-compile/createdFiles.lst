@@ -4,3 +4,5 @@ com\paymentgateway\entity\TransactionRecord.class
 com\paymentgateway\entity\IdempotencyRecord.class
 com\paymentgateway\entity\TransactionStatus.class
 com\paymentgateway\entity\IdempotencyRecord$IdempotencyRecordBuilder.class
+com\paymentgateway\repository\IdempotencyRecordRepository.class
+com\paymentgateway\repository\TransactionRecordRepository.class
