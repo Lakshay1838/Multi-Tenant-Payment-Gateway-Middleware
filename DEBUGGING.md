@@ -95,3 +95,26 @@ http://localhost:8080/actuator/health
 Disable health indicators for infrastructure not provisioned in current story scope, or provision those services before health verification.
 
 
+## 🔍 Issue #3: H2 Console login failed with mem:gatewaydb not found
+* **Phase & User Story:** Phase 1, Story 1.2
+* **The Failure Perimeter:** H2 Console verification checkpoint
+
+### 🚨 The Error Signature
+```text
+Database "mem:gatewaydb" not found, either pre-create it or allow remote database creation [90149-224]
+```
+
+### 🧠 Root Cause Analysis
+The running application datasource URL was set to `jdbc:h2:mem:paymentgateway`, while H2 console login used `jdbc:h2:mem:gatewaydb`. These point to different in-memory databases.
+
+### ✅ Corrective Action Implemented
+Aligned the H2 console JDBC URL with the application datasource URL and restarted the application.
+
+### ✅ Verification Checkpoint
+1. Started service using `mvn spring-boot:run`.
+2. Connected in H2 console with the exact datasource URL from application properties.
+3. Executed `SELECT * FROM TRANSACTION_RECORDS;`.
+4. Confirmed empty result set with expected headers including `AMOUNT`.
+
+### 🔒 Preventive Guardrail
+Use one canonical H2 in-memory database name across `spring.datasource.url` and H2 console login for every local verification run.

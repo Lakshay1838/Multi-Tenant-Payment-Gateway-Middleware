@@ -1,1 +1,4 @@
+com\paymentgateway\entity\TransactionRecord$TransactionRecordBuilder.class
 com\paymentgateway\PaymentGatewayApplication.class
+com\paymentgateway\entity\TransactionRecord.class
+com\paymentgateway\entity\TransactionStatus.class
