@@ -1,5 +1,6 @@
 package com.paymentgateway.interceptor;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -23,9 +24,15 @@ class IdempotencyInterceptorTest {
     @Mock
     private IdempotencyService idempotencyService;
 
+    @Mock
+    private ObjectMapper objectMapper;
+
     @Test
-    void preHandleShouldReturnBadRequestWhenHeaderMissing() throws Exception {
-        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, new ObjectMapper());
+    void testMissingHeader_returns400() throws Exception {
+        when(objectMapper.writeValueAsString(Map.of("error", "Idempotency-Key header is required")))
+                .thenReturn("{\"error\":\"Idempotency-Key header is required\"}");
+
+        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -33,16 +40,17 @@ class IdempotencyInterceptorTest {
 
         assertFalse(result);
         assertEquals(400, response.getStatus());
+        assertTrue(response.getContentAsString().contains("Idempotency-Key header is required"));
     }
 
     @Test
-    void preHandleShouldShortCircuitWhenCacheHit() throws Exception {
+    void testCacheHit_shortCircuits() throws Exception {
         String key = "idem-hit-123";
         String cachedBody = "{\"status\":\"SUCCESS\"}";
 
         when(idempotencyService.findCachedResponse(key)).thenReturn(Optional.of(cachedBody));
 
-        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, new ObjectMapper());
+        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Idempotency-Key", key);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -55,12 +63,12 @@ class IdempotencyInterceptorTest {
     }
 
     @Test
-    void preHandleShouldPassThroughWhenCacheMiss() throws Exception {
+    void testCacheMiss_setsAttributeAndPassesThrough() throws Exception {
         String key = "idem-miss-123";
 
         when(idempotencyService.findCachedResponse(key)).thenReturn(Optional.empty());
 
-        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, new ObjectMapper());
+        IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Idempotency-Key", key);
         MockHttpServletResponse response = new MockHttpServletResponse();

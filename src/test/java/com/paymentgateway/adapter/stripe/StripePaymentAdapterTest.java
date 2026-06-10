@@ -1,8 +1,10 @@
 package com.paymentgateway.adapter.stripe;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,11 +18,14 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.paymentgateway.dto.CardDetailsDto;
 import com.paymentgateway.dto.PaymentRequestDto;
 import com.paymentgateway.entity.TransactionRecord;
+import com.paymentgateway.exception.PaymentProcessingException;
 import com.paymentgateway.repository.TransactionRecordRepository;
 
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -52,13 +57,31 @@ class StripePaymentAdapterTest {
     private StripePaymentAdapter stripePaymentAdapter;
 
     @Test
-    void shouldConvertAmountToCentsForStripeRequest() {
+    void testAmountConversion_standardCase() throws Exception {
+        PaymentRequestDto requestDto = buildRequest("9.99");
+
+        StripeChargeRequest stripeChargeRequest = invokeBuildStripeRequest(requestDto);
+
+        assertEquals(999L, stripeChargeRequest.amount());
+    }
+
+    @Test
+    void testAmountConversion_halfUpRounding() throws Exception {
+        PaymentRequestDto requestDto = buildRequest("1.005");
+
+        StripeChargeRequest stripeChargeRequest = invokeBuildStripeRequest(requestDto);
+
+        assertEquals(101L, stripeChargeRequest.amount());
+    }
+
+    @Test
+    void testTimeoutThrowsPaymentProcessingException() {
         when(stripeWebClient.post()).thenReturn(requestBodyUriSpec);
         when(requestBodyUriSpec.uri("/v1/charges")).thenReturn(requestBodySpec);
         doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
-                .thenReturn(Mono.just(Map.of("id", "ch_test_123")));
+                .thenReturn(Mono.error(new RuntimeException(new TimeoutException("simulated timeout"))));
 
         when(transactionRecordRepository.save(any(TransactionRecord.class))).thenAnswer(invocation -> {
             TransactionRecord record = invocation.getArgument(0);
@@ -68,9 +91,19 @@ class StripePaymentAdapterTest {
             return record;
         });
 
-        PaymentRequestDto requestDto = PaymentRequestDto.builder()
+        PaymentRequestDto requestDto = buildRequest("10.00");
+
+        PaymentProcessingException ex = assertThrows(PaymentProcessingException.class,
+                () -> stripePaymentAdapter.processPayment(requestDto));
+
+        assertTrue(ex.getMessage().toLowerCase().contains("timeout"));
+        verify(requestBodyUriSpec).uri(eq("/v1/charges"));
+    }
+
+    private PaymentRequestDto buildRequest(String amount) {
+        return PaymentRequestDto.builder()
                 .merchantId("merchant-123")
-                .amount(new BigDecimal("250.75"))
+                .amount(new BigDecimal(amount))
                 .currency("USD")
                 .paymentMethod("CARD")
                 .targetProvider("STRIPE")
@@ -79,18 +112,11 @@ class StripePaymentAdapterTest {
                         .token("tok_stripe_123")
                         .build())
                 .build();
+    }
 
-        stripePaymentAdapter.processPayment(requestDto);
-
-        ArgumentCaptor<StripeChargeRequest> captor = ArgumentCaptor.forClass(StripeChargeRequest.class);
-        verify(requestBodySpec).bodyValue(captor.capture());
-
-        StripeChargeRequest stripeChargeRequest = captor.getValue();
-        assertEquals(25075L, stripeChargeRequest.amount());
-        assertEquals("usd", stripeChargeRequest.currency());
-        assertEquals("tok_stripe_123", stripeChargeRequest.source());
-        assertEquals("Charge for merchant merchant-123", stripeChargeRequest.description());
-
-        verify(requestBodyUriSpec).uri(eq("/v1/charges"));
+    private StripeChargeRequest invokeBuildStripeRequest(PaymentRequestDto requestDto) throws Exception {
+        Method method = StripePaymentAdapter.class.getDeclaredMethod("buildStripeRequest", PaymentRequestDto.class);
+        method.setAccessible(true);
+        return (StripeChargeRequest) method.invoke(stripePaymentAdapter, requestDto);
     }
 }

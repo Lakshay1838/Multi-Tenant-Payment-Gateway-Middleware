@@ -3,6 +3,31 @@
 ## Project Description
 This project is a Spring Boot based middleware for processing multi-tenant card payments through pluggable providers. It includes provider routing, idempotency protection, request validation, and normalized error handling to support fintech-grade API behavior.
 
+## Architecture Diagram
+```mermaid
+flowchart LR
+  C[Client Application] -->|POST /api/v1/payments| I[Idempotency Interceptor]
+  I -->|new request| PC[Payment Controller]
+  I -->|repeat key| IC[(Idempotency Cache)]
+  IC --> C
+  PC --> PS[Payment Service]
+  PS --> PF[Payment Strategy Factory]
+  PF --> SA[Stripe Adapter]
+  PF --> PA[PayPal Adapter]
+  SA --> PG[(Provider API)]
+  PA --> PG
+  PS --> DB[(H2 or PostgreSQL)]
+  PS --> RC[(Redis)]
+```
+
+## Project Evidence For Recruiters
+| File or Folder | Purpose | What it shows a recruiter |
+|---|---|---|
+| README.md | Installation guide, architecture view, and feature verification flow. | Technical communication and system design clarity. |
+| DEBUGGING.md | Ledger of production-style root causes and corrective actions. | Structured debugging and resilient problem-solving. |
+| pom.xml | Dependency and plugin management for Spring Boot 3.2 stack. | Strong Java ecosystem and build tooling competence. |
+| postman/ | API collection and environment exports used for endpoint validation. | Practical API testing discipline and coverage mindset. |
+
 ## Technology Stack
 - Java 17
 - Spring Boot 3.2
@@ -30,11 +55,32 @@ mvn clean install
 mvn spring-boot:run
 ```
 
+## Feature Highlights
+- Multi-tenant payment processing with provider routing strategy
+- Idempotency protection for safe retries on payment requests
+- Validation-first API contract using DTO constraints
+- Centralized exception handling with normalized error responses
+- Adapter-based provider integration for Stripe and PayPal
+
 ## H2 Console
 - URL: http://localhost:8080/h2-console
 - JDBC URL: jdbc:h2:mem:paymentgateway
 - Username: sa
 - Password: (leave blank)
+
+## Postman Export Checklist
+Create and place the following files under the postman folder:
+
+- postman/Multi-Tenant-Payment-Gateway.postman_collection.json
+- postman/Multi-Tenant-Payment-Gateway.local.postman_environment.json
+
+Recommended saved requests in the collection:
+
+- Missing Idempotency Header
+- Validation Failure
+- First Successful Payment (Stripe)
+- Idempotency Short-Circuit
+- Unsupported Provider
 
 ## API Reference - 5 Postman Verification Calls
 
