@@ -21,6 +21,7 @@ import com.paymentgateway.entity.TransactionStatus;
 import com.paymentgateway.exception.PaymentProcessingException;
 import com.paymentgateway.repository.TransactionRecordRepository;
 import com.paymentgateway.strategy.PaymentProcessorStrategy;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,6 +51,7 @@ public class PayPalPaymentAdapter implements PaymentProcessorStrategy {
     }
 
     @Override
+    @CircuitBreaker(name = "paypal", fallbackMethod = "circuitBreakerFallback")
     public GatewayResponseDto processPayment(PaymentRequestDto dto) throws PaymentProcessingException {
         TransactionRecord transactionRecord = TransactionRecord.builder()
                 .merchantId(dto.getMerchantId())
@@ -116,5 +118,9 @@ public class PayPalPaymentAdapter implements PaymentProcessorStrategy {
             current = current.getCause();
         }
         return false;
+    }
+
+    public GatewayResponseDto circuitBreakerFallback(PaymentRequestDto dto, Throwable t) {
+        throw new PaymentProcessingException("PayPal circuit breaker open: " + t.getMessage(), t);
     }
 }
