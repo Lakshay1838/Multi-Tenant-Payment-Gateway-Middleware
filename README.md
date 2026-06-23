@@ -27,6 +27,9 @@ flowchart LR
 | DEBUGGING.md | Ledger of production-style root causes and corrective actions. | Structured debugging and resilient problem-solving. |
 | pom.xml | Dependency and plugin management for Spring Boot 3.2 stack. | Strong Java ecosystem and build tooling competence. |
 | postman/ | API collection and environment exports used for endpoint validation. | Practical API testing discipline and coverage mindset. |
+| src/main/java/.../security/ | JWT filter, utility, and Spring Security config. | Stateless auth implementation for fintech APIs. |
+| src/main/java/.../adapter/ | Stripe and PayPal adapters with Resilience4j circuit breakers. | Fault-tolerant integration with external payment providers. |
+| Dockerfile + docker-compose.yml | Containerised full-stack deployment with PostgreSQL and Redis. | Production-aware DevOps and infrastructure-as-code skills. |
 
 ## Technology Stack
 - Java 17
@@ -61,6 +64,20 @@ mvn spring-boot:run
 - Validation-first API contract using DTO constraints
 - Centralized exception handling with normalized error responses
 - Adapter-based provider integration for Stripe and PayPal
+- **JWT authentication** via Spring Security — stateless Bearer token auth on all payment endpoints
+- **Resilience4j circuit breakers** on Stripe and PayPal adapters — opens after 50% failure rate, resets after 10s
+- **Observability** via Spring Actuator — health, metrics, and circuit breaker state exposed at `/actuator`
+
+## Observability
+Spring Boot Actuator is enabled and exposes the following endpoints:
+
+| Endpoint | URL | What it shows |
+|---|---|---|
+| Health | `/actuator/health` | App, DB, and Redis liveness; circuit breaker states |
+| Metrics | `/actuator/metrics` | JVM, HTTP request, and Resilience4j circuit breaker metrics |
+| Circuit Breakers | `/actuator/metrics/resilience4j.circuitbreaker.state` | Live open/closed/half-open state per provider |
+
+In production these endpoints should be secured (e.g., restricted to an internal network or behind Spring Security's `management.endpoints` role protection).
 
 ## H2 Console
 - URL: http://localhost:8080/h2-console
