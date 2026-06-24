@@ -31,19 +31,22 @@ class IdempotencyServiceTest {
     @Test
     void findCachedResponseShouldReturnCachedJsonWhenKeyExists() {
         String idempotencyKey = "idem-key-123";
-        String expectedJson = "{\"status\":\"SUCCESS\",\"providerTransactionId\":\"txn-1\"}";
+        String innerJson = "{\"status\":\"SUCCESS\",\"providerTransactionId\":\"txn-1\"}";
+        // DB record stores a CachedEntry wrapper
+        String storedJson = "{\"httpStatus\":200,\"responseBody\":\"{\\\"status\\\":\\\"SUCCESS\\\",\\\"providerTransactionId\\\":\\\"txn-1\\\"}\"}";
 
         IdempotencyRecord record = IdempotencyRecord.builder()
                 .idempotencyKey(idempotencyKey)
                 .merchantId("merchant-123")
-                .responseBody(expectedJson)
+                .responseBody(storedJson)
                 .build();
 
         when(idempotencyRecordRepository.findById(idempotencyKey)).thenReturn(Optional.of(record));
 
-        Optional<String> cachedResponse = idempotencyService.findCachedResponse(idempotencyKey);
+        Optional<IdempotencyService.CachedEntry> cachedResponse = idempotencyService.findCachedResponse(idempotencyKey);
 
         assertTrue(cachedResponse.isPresent());
-        assertEquals(expectedJson, cachedResponse.get());
+        assertEquals(200, cachedResponse.get().httpStatus());
+        assertEquals(innerJson, cachedResponse.get().responseBody());
     }
 }

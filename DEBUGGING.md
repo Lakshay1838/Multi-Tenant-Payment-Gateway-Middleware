@@ -118,3 +118,46 @@ Aligned the H2 console JDBC URL with the application datasource URL and restarte
 
 ### 🔒 Preventive Guardrail
 Use one canonical H2 in-memory database name across `spring.datasource.url` and H2 console login for every local verification run.
+
+---
+
+## 🔍 Issue #4: Docker build failed — unit tests incompatible with refactored IdempotencyService API
+* **Phase & User Story:** Phase 3, Docker containerization
+* **The Failure Perimeter:** Docker image build (`mvn clean package -DskipTests -q` inside container)
+
+### 🚨 The Error Signature
+```text
+[ERROR] COMPILATION ERROR :
+[ERROR] /app/src/test/java/com/paymentgateway/service/IdempotencyServiceTest.java:[44,80]
+  incompatible types: Optional<IdempotencyService.CachedEntry> cannot be converted to Optional<String>
+[ERROR] /app/src/test/java/com/paymentgateway/interceptor/IdempotencyInterceptorTest.java:[51,57]
+  no suitable method found for thenReturn(Optional<String>)
+[ERROR] /app/src/test/java/com/paymentgateway/service/PaymentServiceTest.java:[72,17]
+  method cacheResponse cannot be applied to given types;
+  required: String, String, int, String
+  found: String, String, GatewayResponseDto
+ERROR: process "/bin/sh -c mvn clean package -DskipTests -q" did not complete successfully: exit code: 1
+```
+
+### 🧠 Root Cause Analysis
+A prior fix (Issue #3 — idempotency short-circuit for error responses) changed two `IdempotencyService` method signatures:
+1. `findCachedResponse()` return type changed from `Optional<String>` to `Optional<CachedEntry>` (a new record wrapping httpStatus + responseBody).
+2. `cacheResponse()` signature changed from `(key, merchantId, GatewayResponseDto)` to `(key, merchantId, int httpStatus, String responseBody)`.
+
+The three unit tests were written against the old signatures and were not updated. The build ran `-DskipTests` which skips test *execution* but NOT test *compilation* — so the stale test code caused a compile failure inside Docker.
+
+**Why it worked locally but failed in Docker:**
+`mvn clean compile` (used for local verification) only compiles `src/main`. Docker runs `mvn clean package` which also compiles `src/test`, exposing the stale test code.
+
+### ✅ Corrective Action Implemented
+Updated all three affected test files to match the new API:
+- `IdempotencyServiceTest`: changed return type assertion from `Optional<String>` to `Optional<CachedEntry>`, stored `CachedEntry` JSON in the mock DB record.
+- `IdempotencyInterceptorTest`: changed `thenReturn(Optional.of(cachedBody))` to `thenReturn(Optional.of(new CachedEntry(200, cachedBody)))`.
+- `PaymentServiceTest`: added `@Mock ObjectMapper`, updated `verify(idempotencyService).cacheResponse(...)` to match `(key, merchantId, 200, anyString())`.
+
+### ✅ Verification Checkpoint
+1. Ran `mvn clean test-compile -q` locally — exit code 0, no errors.
+2. Ran `docker build --progress=plain -t payment-gateway .` — image built and exported successfully.
+
+### 🔒 Preventive Guardrail
+When refactoring a service method signature, always run `mvn clean test-compile` (not just `compile`) before committing. Consider adding a pre-commit hook or CI step that runs `mvn test-compile` to catch stale test code before it reaches Docker.

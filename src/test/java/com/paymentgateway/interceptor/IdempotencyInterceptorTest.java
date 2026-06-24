@@ -48,7 +48,8 @@ class IdempotencyInterceptorTest {
         String key = "idem-hit-123";
         String cachedBody = "{\"status\":\"SUCCESS\"}";
 
-        when(idempotencyService.findCachedResponse(key)).thenReturn(Optional.of(cachedBody));
+        when(idempotencyService.findCachedResponse(key))
+                .thenReturn(Optional.of(new IdempotencyService.CachedEntry(200, cachedBody)));
 
         IdempotencyInterceptor interceptor = new IdempotencyInterceptor(idempotencyService, objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest();
