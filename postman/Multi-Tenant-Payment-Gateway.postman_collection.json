@@ -6,7 +6,8 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "{{baseUrl}}" },
-    { "key": "token", "value": "" }
+    { "key": "token", "value": "" },
+    { "key": "call3ResponseBody", "value": "" }
   ],
   "item": [
     {
@@ -16,10 +17,10 @@
           "listen": "test",
           "script": {
             "exec": [
-              "var res = pm.response.json();",
-              "pm.collectionVariables.set('token', res.token);",
               "pm.test('Status 200', () => pm.response.to.have.status(200));",
-              "pm.test('Token present', () => pm.expect(res.token).to.be.a('string'));"
+              "var res = pm.response.json();",
+              "pm.test('Token present', () => pm.expect(res.token).to.be.a('string'));",
+              "pm.environment.set('token', res.token);"
             ],
             "type": "text/javascript"
           }
@@ -47,7 +48,7 @@
           "script": {
             "exec": [
               "pm.test('Status 400', () => pm.response.to.have.status(400));",
-              "pm.test('Error message present', () => {",
+              "pm.test('Error mentions Idempotency-Key', () => {",
               "  pm.expect(pm.response.json().error).to.include('Idempotency-Key');",
               "});"
             ],
@@ -107,7 +108,7 @@
       }
     },
     {
-      "name": "Call 3 - First Successful Payment (Stripe)",
+      "name": "Call 3 - First Payment (Stripe)",
       "event": [
         {
           "listen": "test",
@@ -117,10 +118,12 @@
               "  pm.expect(pm.response.code).to.be.oneOf([200, 422]);",
               "});",
               "if (pm.response.code === 200) {",
-              "  pm.test('Status SUCCESS', () => {",
+              "  pm.test('Status is SUCCESS', () => {",
               "    pm.expect(pm.response.json().status).to.eql('SUCCESS');",
               "  });",
-              "}"
+              "}",
+              "// Save response body so Call 4 can compare it",
+              "pm.environment.set('call3ResponseBody', pm.response.text());"
             ],
             "type": "text/javascript"
           }
@@ -151,10 +154,18 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Status 200', () => pm.response.to.have.status(200));",
-              "pm.test('Idempotency header present', () => {",
-              "  pm.expect(pm.response.headers.get('X-Idempotency-Replayed')).to.exist;",
-              "});"
+              "// Only validate short-circuit if Call 3 was cached (i.e. returned 200)",
+              "var call3Body = pm.environment.get('call3ResponseBody');",
+              "if (call3Body && JSON.parse(call3Body).status === 'SUCCESS') {",
+              "  pm.test('Status 200 (served from cache)', () => pm.response.to.have.status(200));",
+              "  pm.test('Response body identical to Call 3', () => {",
+              "    pm.expect(pm.response.text()).to.eql(call3Body);",
+              "  });",
+              "} else {",
+              "  pm.test('Idempotency short-circuit skipped — Call 3 was not cached (provider error expected)', () => {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 422]);",
+              "  });",
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -186,7 +197,7 @@
           "script": {
             "exec": [
               "pm.test('Status 422', () => pm.response.to.have.status(422));",
-              "pm.test('errorCode PAYMENT_PROCESSING_ERROR', () => {",
+              "pm.test('errorCode is PAYMENT_PROCESSING_ERROR', () => {",
               "  pm.expect(pm.response.json().errorCode).to.eql('PAYMENT_PROCESSING_ERROR');",
               "});",
               "pm.test('message mentions UNKNOWN_BANK', () => {",

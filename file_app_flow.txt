@@ -1,0 +1,138 @@
+MULTI-TENANT PAYMENT GATEWAY — APPLICATION FLOW (LAYER BY LAYER)
+=================================================================
+
+
+LAYER 0 — Application Boot
+---------------------------
+File: PaymentGatewayApplication.java
+
+@SpringBootApplication + SpringApplication.run(...) — this is the single entry point.
+Spring scans all packages, wires every bean, and starts the embedded Tomcat server.
+
+
+LAYER 1 — Security Filter (runs on every request)
+--------------------------------------------------
+Files: SecurityConfig.java → JwtAuthFilter.java → JwtUtil.java
+
+Before any of your code sees the request, Spring Security's filter chain runs:
+
+1. SecurityConfig registers JwtAuthFilter BEFORE UsernamePasswordAuthenticationFilter
+2. JwtAuthFilter.doFilterInternal() reads the "Authorization: Bearer <token>" header
+3. JwtUtil.isValid() validates the token → extracts username → sets SecurityContextHolder
+4. If the token is missing/invalid, the request is rejected as 401 before reaching anything else
+5. Exception: /api/v1/auth/login, /h2-console/**, /actuator/health are permitted without a token
+
+
+LAYER 2 — Idempotency Interceptor (runs on /api/v1/payments/**)
+----------------------------------------------------------------
+Files: WebMvcConfig.java → IdempotencyInterceptor.java → IdempotencyService.java
+
+After security passes, the MVC interceptor runs:
+
+1. WebMvcConfig.addInterceptors() registers IdempotencyInterceptor on the payments path
+2. IdempotencyInterceptor.preHandle() checks for the "Idempotency-Key" header:
+   - Missing header  → writes {"error": "Idempotency-Key header is required"} → 400, request stops
+   - Key found in DB → writes the cached response back → 200, request stops (short-circuit)
+   - New key         → stores the key as a request attribute (IDEMPOTENCY_KEY) and passes through
+
+
+LAYER 3 — Controller
+---------------------
+File: PaymentController.java
+
+The request finally reaches the controller:
+
+- @PostMapping("/payments") handles the request
+- @Valid @RequestBody triggers Bean Validation on PaymentRequestDto
+  If any field fails (merchantId blank, amount negative, currency wrong size),
+  a MethodArgumentNotValidException is thrown immediately
+- Retrieves the IDEMPOTENCY_KEY attribute set by the interceptor
+- Delegates to PaymentService.processPayment()
+
+
+LAYER 4 — Service
+------------------
+File: PaymentService.java
+
+Orchestration layer — no business logic, just wires things together:
+
+1. Calls PaymentStrategyFactory.resolve(targetProvider) to get the right adapter
+2. Calls strategy.processPayment(requestDto)
+3. Calls IdempotencyService.cacheResponse() to save the result so future
+   duplicate requests short-circuit at Layer 2
+
+
+LAYER 5 — Strategy Factory
+---------------------------
+Files: PaymentStrategyFactory.java → PaymentProcessorStrategy (interface)
+
+Spring auto-discovers all beans that implement PaymentProcessorStrategy and
+registers them in a Map<providerName → strategy>:
+
+  "STRIPE"  → StripePaymentAdapter
+  "PAYPAL"  → PayPalPaymentAdapter
+
+If providerName is not in the map → throws PaymentProcessingException("Unsupported payment provider: ...")
+
+
+LAYER 6 — Adapter (Provider Integration)
+-----------------------------------------
+Files: StripePaymentAdapter.java / PayPalPaymentAdapter.java
+
+The concrete implementation of PaymentProcessorStrategy:
+
+1. Creates a TransactionRecord with status PENDING and saves it to DB
+2. Builds the provider-specific request body (StripeChargeRequest)
+3. Makes an HTTP call via WebClient to the provider API (configured in WebClientConfig)
+4. @CircuitBreaker(name = "stripe") wraps the call — if failure rate > 50%,
+   opens the circuit and calls circuitBreakerFallback() which throws PaymentProcessingException
+5. On success  → updates TransactionRecord to SUCCESS, returns GatewayResponseDto
+6. On WebClientResponseException → updates to FAILED, throws PaymentProcessingException
+7. On timeout  → keeps PENDING, throws PaymentProcessingException
+
+
+LAYER 7 — Exception Handler (cross-cutting)
+--------------------------------------------
+File: GlobalExceptionHandler.java
+
+@ControllerAdvice catches exceptions thrown from any layer above:
+
+  Exception                        | HTTP | errorCode
+  ---------------------------------|------|-------------------------
+  MethodArgumentNotValidException  | 400  | VALIDATION_ERROR
+  PaymentProcessingException       | 422  | PAYMENT_PROCESSING_ERROR
+  Everything else                  | 500  | INTERNAL_SERVER_ERROR
+
+
+THE FULL FLOW AS A CHAIN
+=========================
+
+POST /api/v1/payments
+    │
+    ▼
+[JwtAuthFilter]           ← 401 if no valid Bearer token
+    │
+    ▼
+[IdempotencyInterceptor]  ← 400 if no Idempotency-Key header
+    │                     ← 200 (cached) if key already seen
+    ▼
+[PaymentController]       ← 400 if @Valid fails (GlobalExceptionHandler)
+    │
+    ▼
+[PaymentService]
+    │
+    ▼
+[PaymentStrategyFactory]  ← 422 if provider not found
+    │
+    ▼
+[StripeAdapter / PayPalAdapter]   ← 422 on provider error / timeout / circuit open
+    │
+    ▼
+[IdempotencyService.cacheResponse()]  ← saves result to DB
+    │
+    ▼
+200 OK → GatewayResponseDto
+
+Each layer has a single responsibility and a clear exit condition.
+If something goes wrong at any layer, GlobalExceptionHandler normalizes
+the error into a consistent ErrorResponseDto.

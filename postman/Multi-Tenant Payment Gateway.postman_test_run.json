@@ -1,0 +1,238 @@
+{
+	"id": "78c43e53-867b-48d9-9835-38637199da7a",
+	"name": "Multi-Tenant Payment Gateway",
+	"timestamp": "2026-06-24T05:44:29.771Z",
+	"collection_id": "37632869-d78c2cea-92d4-4570-9a96-1310ca03f2ed",
+	"folder_id": 0,
+	"environment_id": "37632869-6b8add30-116c-46e2-802e-a7e6831a19ab",
+	"totalPass": 2,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2026-06-24T05:44:28.377Z",
+	"totalFail": 9,
+	"results": [
+		{
+			"id": "61b24d8e-1631-4091-abf9-15eacb8f672c",
+			"name": "Login (get JWT token)",
+			"url": "http://localhost:8080/api/v1/auth/login?username=admin&password=admin123",
+			"time": 327,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Token present": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Token present": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				327
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Token present": true
+				}
+			]
+		},
+		{
+			"id": "f394232c-9c17-497e-ac78-72b9a186ab73",
+			"name": "Call 1 - Missing Idempotency Header",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 18,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 400": false,
+				"Error mentions Idempotency-Key": false
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 0,
+					"fail": 1
+				},
+				"Error mentions Idempotency-Key": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				18
+			],
+			"allTests": [
+				{
+					"Status 400": false,
+					"Error mentions Idempotency-Key": false
+				}
+			]
+		},
+		{
+			"id": "82958872-5cb7-4d1c-b0f1-3d6f3577fd7f",
+			"name": "Call 2 - Validation Failure",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 16,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 400": false,
+				"errorCode is VALIDATION_ERROR": false
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 0,
+					"fail": 1
+				},
+				"errorCode is VALIDATION_ERROR": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				16
+			],
+			"allTests": [
+				{
+					"Status 400": false,
+					"errorCode is VALIDATION_ERROR": false
+				}
+			]
+		},
+		{
+			"id": "d92af6f8-606d-4533-9f29-d4a1f470be61",
+			"name": "Call 3 - First Payment (Stripe)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 55,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 200 or 422": false
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				55
+			],
+			"allTests": [
+				{
+					"Status 200 or 422": false
+				}
+			]
+		},
+		{
+			"id": "0566f4ea-a754-4314-87de-e0849c8a753f",
+			"name": "Call 4 - Idempotency Short-Circuit",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 15,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Idempotency short-circuit skipped — Call 3 was not cached (provider error expected)": false
+			},
+			"testPassFailCounts": {
+				"Idempotency short-circuit skipped — Call 3 was not cached (provider error expected)": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				15
+			],
+			"allTests": [
+				{
+					"Idempotency short-circuit skipped — Call 3 was not cached (provider error expected)": false
+				}
+			]
+		},
+		{
+			"id": "ddb60c17-b8da-4b50-839c-7a97ebf52ea8",
+			"name": "Call 5 - Unsupported Provider",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 20,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 422": false,
+				"errorCode is PAYMENT_PROCESSING_ERROR": false,
+				"message mentions UNKNOWN_BANK": false
+			},
+			"testPassFailCounts": {
+				"Status 422": {
+					"pass": 0,
+					"fail": 1
+				},
+				"errorCode is PAYMENT_PROCESSING_ERROR": {
+					"pass": 0,
+					"fail": 1
+				},
+				"message mentions UNKNOWN_BANK": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				20
+			],
+			"allTests": [
+				{
+					"Status 422": false,
+					"errorCode is PAYMENT_PROCESSING_ERROR": false,
+					"message mentions UNKNOWN_BANK": false
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 451,
+	"collection": {
+		"requests": [
+			{
+				"id": "61b24d8e-1631-4091-abf9-15eacb8f672c",
+				"method": "POST"
+			},
+			{
+				"id": "f394232c-9c17-497e-ac78-72b9a186ab73",
+				"method": "POST"
+			},
+			{
+				"id": "82958872-5cb7-4d1c-b0f1-3d6f3577fd7f",
+				"method": "POST"
+			},
+			{
+				"id": "d92af6f8-606d-4533-9f29-d4a1f470be61",
+				"method": "POST"
+			},
+			{
+				"id": "0566f4ea-a754-4314-87de-e0849c8a753f",
+				"method": "POST"
+			},
+			{
+				"id": "ddb60c17-b8da-4b50-839c-7a97ebf52ea8",
+				"method": "POST"
+			}
+		]
+	}
+}

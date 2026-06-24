@@ -1,0 +1,90 @@
+Multi-Tenant Payment Gateway - Project Summary
+=============================================
+
+Project overview:
+- A Spring Boot (Java 17) middleware for multi-tenant payment processing.
+- Routes payments to provider adapters (Stripe, PayPal) using a Strategy pattern.
+- Enforces idempotency, validates requests, persists transactions, and normalizes errors.
+
+Key features:
+- Provider adapters for Stripe and PayPal (adapter pattern).
+- Idempotency protection via an interceptor + database-backed cache.
+- Strategy-based provider selection and pluggable provider implementations.
+- JPA entities for audit and idempotency records.
+- Centralized exception handling returning normalized error DTOs.
+
+Folder structure (workspace root):
+- README.md: Project overview, architecture, API verification steps.
+- DEBUGGING.md: Troubleshooting notes and evidence.
+- .gitignore: VCS ignore rules.
+- pom.xml: Maven build configuration and dependencies.
+- postman/: Postman collection guidance and exports.
+- src/main/resources/: runtime config and DB schema (`application.properties`, `schema.sql`).
+- src/main/java/com/paymentgateway/: main application code (controllers, services, adapters, strategy, config, entities, repos, DTOs, exceptions, interceptors).
+- src/test/java/: unit and integration tests.
+
+Core files and responsibilities:
+
+- `PaymentGatewayApplication.java`
+  - Spring Boot entry point; starts the application.
+
+- Controllers:
+  - `controller/PaymentController.java`: Exposes POST /api/v1/payments; reads idempotency key set by the interceptor and delegates to `PaymentService`.
+
+- Services:
+  - `service/PaymentService.java`: Orchestrates payment processing: resolves provider strategy, invokes it, and caches responses via `IdempotencyService`.
+  - `service/IdempotencyService.java`: Manages idempotency records (find + cache); serializes `GatewayResponseDto` and saves `IdempotencyRecord` using a SERIALIZABLE transaction to avoid races.
+
+- Strategy & adapters:
+  - `strategy/PaymentStrategyFactory.java`: Registers `PaymentProcessorStrategy` implementations and resolves one by provider name (throws `PaymentProcessingException` for unsupported providers).
+  - `strategy/PaymentProcessorStrategy.java`: Interface providers implement (`getProviderName()`, `processPayment(...)`).
+  - `adapter/stripe/StripePaymentAdapter.java`: Implements Stripe integration; builds `StripeChargeRequest`, calls Stripe via `WebClient`, persists `TransactionRecord`, and returns `GatewayResponseDto`.
+  - `adapter/stripe/StripeChargeRequest.java`: Stripe API request mapping (record).
+  - `adapter/paypal/PayPalPaymentAdapter.java`: Implements PayPal integration; builds `PayPalOrderRequest`, calls PayPal, persists `TransactionRecord`, and returns `GatewayResponseDto`.
+  - `adapter/paypal/PayPalOrderRequest.java`, `adapter/paypal/Amount.java`, `adapter/paypal/PurchaseUnit.java`: PayPal request payload records.
+
+- Persistence & repositories:
+  - `entity/TransactionRecord.java`: JPA entity for transaction audit (UUID id, merchantId, amount, currency, status, providerTransactionId, timestamps).
+  - `entity/TransactionStatus.java`: Enum (PENDING, SUCCESS, FAILED).
+  - `entity/IdempotencyRecord.java`: JPA entity storing idempotency key and serialized response body.
+  - `repository/TransactionRecordRepository.java`: JPA repo with finder by providerTransactionId.
+  - `repository/IdempotencyRecordRepository.java`: JPA repo for `IdempotencyRecord`.
+
+- Interceptor & config:
+  - `interceptor/IdempotencyInterceptor.java`: Enforces presence of `Idempotency-Key` header; short-circuits and returns cached response if found; otherwise attaches `IDEMPOTENCY_KEY` to request attributes.
+  - `config/WebClientConfig.java`: Configures named `WebClient` beans (`stripeWebClient`, `paypalWebClient`) with base URLs, auth header, and timeouts read from `application.properties`.
+  - `config/WebMvcConfig.java`: Registers the `IdempotencyInterceptor` for `/api/v1/payments/**`.
+
+- DTOs & exceptions:
+  - `dto/PaymentRequestDto.java`: Incoming request DTO with validation annotations (merchantId, amount, currency, paymentMethod, targetProvider, cardDetails).
+  - `dto/CardDetailsDto.java`: Card/token holder DTO.
+  - `dto/GatewayResponseDto.java`: Success response returned to clients (gatewayTransactionId, providerTransactionId, status, amounts, timestamps, errorDetails).
+  - `dto/ErrorResponseDto.java`: Normalized error response shape.
+  - `exception/PaymentProcessingException.java`: Runtime exception for processing/provider errors.
+  - `exception/GlobalExceptionHandler.java`: Maps validation errors (400), `PaymentProcessingException` (422), and generic errors (500) to `ErrorResponseDto`.
+
+- Resources:
+  - `application.properties`: H2 datasource config, provider base URLs and mock keys, server port, JPA settings.
+  - `schema.sql`: Creates `transaction_records` and `idempotency_records` tables used by the application at startup.
+
+- Tests (src/test/java):
+  - Adapter tests (`StripePaymentAdapterTest`, `PayPalPaymentAdapterTest`), service tests (`PaymentServiceTest`, `IdempotencyServiceTest`), interceptor and controller integration tests, DTO validation tests, and strategy factory tests.
+
+How the main flow ties together:
+- Client -> POST /api/v1/payments -> `IdempotencyInterceptor` checks `Idempotency-Key`.
+- If cached: interceptor short-circuits and returns saved response.
+- If new: `PaymentController` receives request, `PaymentService` resolves provider strategy via `PaymentStrategyFactory`.
+- Provider adapter persists a `TransactionRecord`, calls external provider API via `WebClient`, updates transaction status, and returns a `GatewayResponseDto`.
+- `IdempotencyService` serializes that response and stores an `IdempotencyRecord` for subsequent retries.
+- Any validation or processing errors are handled by `GlobalExceptionHandler` and returned as `ErrorResponseDto`.
+
+Running the project (from repo root):
+  mvn clean install
+  mvn spring-boot:run
+
+File location:
+- SUMMARY.txt (this file) — repository root.
+
+If you'd like, I can also:
+- create a more detailed per-file notes file with method summaries and important lines, or
+- add this summary as `docs/SUMMARY.md` instead. Reply which you prefer.
