@@ -3,7 +3,10 @@ package com.paymentgateway.exception;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -30,6 +33,17 @@ public class GlobalExceptionHandler {
                         message,
                         Instant.now().toString(),
                         400));
+    }
+
+    @ExceptionHandler({BadCredentialsException.class, UsernameNotFoundException.class})
+    public ResponseEntity<ErrorResponseDto> handleAuthError(RuntimeException ex) {
+        log.warn("Authentication error: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponseDto(
+                        "UNAUTHORIZED",
+                        ex.getMessage(),
+                        Instant.now().toString(),
+                        401));
     }
 
     @ExceptionHandler(PaymentProcessingException.class)

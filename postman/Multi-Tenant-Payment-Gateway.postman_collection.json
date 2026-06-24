@@ -11,220 +11,320 @@
   ],
   "item": [
     {
-      "name": "Login (get JWT token)",
-      "event": [
+      "name": "AUTH",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 200', () => pm.response.to.have.status(200));",
-              "var res = pm.response.json();",
-              "pm.test('Token present', () => pm.expect(res.token).to.be.a('string'));",
-              "pm.environment.set('token', res.token);"
-            ],
-            "type": "text/javascript"
+          "name": "A1 - Login valid credentials",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "var res = pm.response.json();",
+            "pm.test('Token is a string', () => pm.expect(res.token).to.be.a('string').and.not.empty);",
+            "pm.environment.set('token', res.token);"
+          ]}}],
+          "request": {
+            "method": "POST", "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login?username=admin&password=admin123", "host": ["{{baseUrl}}"], "path": ["api","v1","auth","login"], "query": [{"key":"username","value":"admin"},{"key":"password","value":"admin123"}] }
+          }
+        },
+        {
+          "name": "A2 - Login wrong password (EP: invalid credentials)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401 or 403', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"
+          ]}}],
+          "request": {
+            "method": "POST", "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login?username=admin&password=wrongpass", "host": ["{{baseUrl}}"], "path": ["api","v1","auth","login"], "query": [{"key":"username","value":"admin"},{"key":"password","value":"wrongpass"}] }
+          }
+        },
+        {
+          "name": "A3 - Login unknown user (EP: non-existent user)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401 or 403 or 404', () => pm.expect(pm.response.code).to.be.oneOf([401, 403, 404]));"
+          ]}}],
+          "request": {
+            "method": "POST", "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login?username=ghost&password=anything", "host": ["{{baseUrl}}"], "path": ["api","v1","auth","login"], "query": [{"key":"username","value":"ghost"},{"key":"password","value":"anything"}] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/auth/login?username=admin&password=admin123",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "auth", "login"],
-          "query": [
-            { "key": "username", "value": "admin" },
-            { "key": "password", "value": "admin123" }
-          ]
-        }
-      }
+      ]
     },
     {
-      "name": "Call 1 - Missing Idempotency Header",
-      "event": [
+      "name": "SECURITY",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 400', () => pm.response.to.have.status(400));",
-              "pm.test('Error mentions Idempotency-Key', () => {",
-              "  pm.expect(pm.response.json().error).to.include('Idempotency-Key');",
-              "});"
-            ],
-            "type": "text/javascript"
+          "name": "S1 - No Authorization header (unauthenticated)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Idempotency-Key","value":"sec-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "S2 - Invalid/malformed JWT token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer invalid.jwt.token"},{"key":"Idempotency-Key","value":"sec-002"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"merchantId\": \"merchant-any\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"targetProvider\": \"STRIPE\",\n  \"cardDetails\": {\n    \"holderName\": \"John\",\n    \"token\": \"tok_test\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/payments",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments"]
-        }
-      }
+      ]
     },
     {
-      "name": "Call 2 - Validation Failure",
-      "event": [
+      "name": "IDEMPOTENCY",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 400', () => pm.response.to.have.status(400));",
-              "pm.test('errorCode is VALIDATION_ERROR', () => {",
-              "  pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR');",
-              "});"
-            ],
-            "type": "text/javascript"
+          "name": "I1 - Missing Idempotency-Key header",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('Error mentions Idempotency-Key', () => pm.expect(pm.response.json().error).to.include('Idempotency-Key'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "I2 - First payment with idem-key (new request)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200 or 422', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+            "pm.environment.set('call3ResponseBody', pm.response.text());"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"idem-test-002"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":250.75,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John Doe\",\"token\":\"tok_mock_card_visa\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "I3 - Duplicate idem-key (short-circuit cache hit)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "var call3Body = pm.environment.get('call3ResponseBody');",
+            "pm.test('Status matches Call I2', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+            "pm.test('Response body identical to I2 (idempotency guaranteed)', () => pm.expect(pm.response.text()).to.eql(call3Body));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"idem-test-002"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":250.75,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John Doe\",\"token\":\"tok_mock_card_visa\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Idempotency-Key", "value": "idem-test-001" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"merchantId\": \"\",\n  \"amount\": -5.00,\n  \"currency\": \"US\",\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"targetProvider\": \"STRIPE\",\n  \"cardDetails\": {\n    \"holderName\": \"John\",\n    \"token\": \"tok_test\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/payments",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments"]
-        }
-      }
+      ]
     },
     {
-      "name": "Call 3 - First Payment (Stripe)",
-      "event": [
+      "name": "VALIDATION — Boundary Value Analysis",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 200 or 422', () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 422]);",
-              "});",
-              "if (pm.response.code === 200) {",
-              "  pm.test('Status is SUCCESS', () => {",
-              "    pm.expect(pm.response.json().status).to.eql('SUCCESS');",
-              "  });",
-              "}",
-              "// Save response body so Call 4 can compare it",
-              "pm.environment.set('call3ResponseBody', pm.response.text());"
-            ],
-            "type": "text/javascript"
+          "name": "V1 - Empty merchantId (BVA: blank string)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));",
+            "pm.test('merchantId mentioned', () => pm.expect(pm.response.json().message).to.include('merchantId'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V2 - Amount = 0.00 (BVA: below minimum 0.01)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));",
+            "pm.test('amount mentioned', () => pm.expect(pm.response.json().message).to.include('amount'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-002"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":0.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V3 - Amount = -1.00 (BVA: negative)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-003"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":-1.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V4 - Amount = 0.01 (BVA: minimum valid amount)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200 or 422 (valid amount accepted)', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-004"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":0.01,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V5 - Currency 2 chars (BVA: below ISO 4217 min length)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));",
+            "pm.test('currency mentioned', () => pm.expect(pm.response.json().message).to.include('currency'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-005"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"US\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V6 - Currency 4 chars (BVA: above ISO 4217 max length)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-006"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USDD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V7 - Missing cardDetails (EP: null nested object)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-007"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\"}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V8 - Blank cardDetails.holderName (EP: blank nested field)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-008"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "V9 - Multiple violations at once (EP: combined invalid fields)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));",
+            "pm.test('Multiple fields in message', () => {",
+            "  var msg = pm.response.json().message;",
+            "  pm.expect(msg).to.include('merchantId');",
+            "  pm.expect(msg).to.include('amount');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"val-009"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"\",\"amount\":-5.00,\"currency\":\"US\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Idempotency-Key", "value": "idem-test-002" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"merchantId\": \"merch_998811\",\n  \"amount\": 250.75,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"targetProvider\": \"STRIPE\",\n  \"cardDetails\": {\n    \"holderName\": \"John Doe\",\n    \"token\": \"tok_mock_card_visa\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/payments",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments"]
-        }
-      }
+      ]
     },
     {
-      "name": "Call 4 - Idempotency Short-Circuit",
-      "event": [
+      "name": "PROVIDER ROUTING",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Only validate short-circuit if Call 3 was cached (i.e. returned 200)",
-              "var call3Body = pm.environment.get('call3ResponseBody');",
-              "if (call3Body && JSON.parse(call3Body).status === 'SUCCESS') {",
-              "  pm.test('Status 200 (served from cache)', () => pm.response.to.have.status(200));",
-              "  pm.test('Response body identical to Call 3', () => {",
-              "    pm.expect(pm.response.text()).to.eql(call3Body);",
-              "  });",
-              "} else {",
-              "  pm.test('Idempotency short-circuit skipped — Call 3 was not cached (provider error expected)', () => {",
-              "    pm.expect(pm.response.code).to.be.oneOf([200, 422]);",
-              "  });",
-              "}"
-            ],
-            "type": "text/javascript"
+          "name": "P1 - Stripe provider (EP: valid provider)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200 or 422 (routed to Stripe)', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+            "if (pm.response.code === 200) {",
+            "  pm.test('Response has gatewayTransactionId', () => pm.expect(pm.response.json().gatewayTransactionId).to.be.a('string'));",
+            "  pm.test('Status is SUCCESS', () => pm.expect(pm.response.json().status).to.eql('SUCCESS'));",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"prov-stripe-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":250.75,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"STRIPE\",\"cardDetails\":{\"holderName\":\"John Doe\",\"token\":\"tok_mock_card_visa\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "P2 - PayPal provider (EP: valid provider)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200 or 422 (routed to PayPal)', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+            "if (pm.response.code === 200) {",
+            "  pm.test('Status is SUCCESS', () => pm.expect(pm.response.json().status).to.eql('SUCCESS'));",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"prov-paypal-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":99.99,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"PAYPAL\",\"cardDetails\":{\"holderName\":\"Jane Doe\",\"token\":\"tok_mock_paypal\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "P3 - Case-insensitive provider name (EP: lowercase stripe)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200 or 422 (case-insensitive routing accepted)', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"prov-case-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"stripe\",\"cardDetails\":{\"holderName\":\"John Doe\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "P4 - Unsupported provider (EP: unknown provider)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));",
+            "pm.test('errorCode PAYMENT_PROCESSING_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('PAYMENT_PROCESSING_ERROR'));",
+            "pm.test('message mentions UNKNOWN_BANK', () => pm.expect(pm.response.json().message).to.include('UNKNOWN_BANK'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"prov-unk-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"merch_998811\",\"amount\":250.75,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"UNKNOWN_BANK\",\"cardDetails\":{\"holderName\":\"John Doe\",\"token\":\"tok_mock_card_visa\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
+          }
+        },
+        {
+          "name": "P5 - Empty targetProvider (EP: blank provider, triggers validation)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('errorCode VALIDATION_ERROR', () => pm.expect(pm.response.json().errorCode).to.eql('VALIDATION_ERROR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Idempotency-Key","value":"prov-empty-001"},{"key":"Content-Type","value":"application/json"}],
+            "body": { "mode": "raw", "raw": "{\"merchantId\":\"m1\",\"amount\":10.00,\"currency\":\"USD\",\"paymentMethod\":\"CREDIT_CARD\",\"targetProvider\":\"\",\"cardDetails\":{\"holderName\":\"John\",\"token\":\"tok_test\"}}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api","v1","payments"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Idempotency-Key", "value": "idem-test-002" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"merchantId\": \"merch_998811\",\n  \"amount\": 250.75,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"targetProvider\": \"STRIPE\",\n  \"cardDetails\": {\n    \"holderName\": \"John Doe\",\n    \"token\": \"tok_mock_card_visa\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/payments",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments"]
-        }
-      }
-    },
-    {
-      "name": "Call 5 - Unsupported Provider",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 422', () => pm.response.to.have.status(422));",
-              "pm.test('errorCode is PAYMENT_PROCESSING_ERROR', () => {",
-              "  pm.expect(pm.response.json().errorCode).to.eql('PAYMENT_PROCESSING_ERROR');",
-              "});",
-              "pm.test('message mentions UNKNOWN_BANK', () => {",
-              "  pm.expect(pm.response.json().message).to.include('UNKNOWN_BANK');",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Idempotency-Key", "value": "idem-test-003" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"merchantId\": \"merch_998811\",\n  \"amount\": 250.75,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"targetProvider\": \"UNKNOWN_BANK\",\n  \"cardDetails\": {\n    \"holderName\": \"John Doe\",\n    \"token\": \"tok_mock_card_visa\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/payments",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments"]
-        }
-      }
+      ]
     }
   ]
 }

@@ -37,12 +37,13 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        Optional<String> cached = idempotencyService.findCachedResponse(idempotencyKey);
+        Optional<IdempotencyService.CachedEntry> cached = idempotencyService.findCachedResponse(idempotencyKey);
         if (cached.isPresent()) {
             log.info("Short-circuiting duplicate request for idempotency key: {}", idempotencyKey);
-            response.setStatus(HttpServletResponse.SC_OK);
+            IdempotencyService.CachedEntry entry = cached.get();
+            response.setStatus(entry.httpStatus());
             response.setContentType("application/json");
-            response.getWriter().write(cached.get());
+            response.getWriter().write(entry.responseBody());
             return false;
         }
 
