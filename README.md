@@ -1,27 +1,43 @@
 # Multi-Tenant Payment Gateway Middleware
 
 ## Project Description
-This project is a Spring Boot based middleware for processing multi-tenant card payments through pluggable providers. It includes JWT authentication, provider routing, idempotency protection, request validation, and normalized error handling to support fintech-grade API behavior.
+This project is a Spring Boot based middleware for processing multi-tenant card payments through pluggable providers. It includes JWT authentication, provider routing, idempotency protection, request validation, and normalized error handling to support fintech-grade API behavior. The application is fully containerized with Docker Compose, wiring the Spring Boot app, PostgreSQL, and Redis together.
 
 ## Architecture Diagram
 ```mermaid
 flowchart LR
   C[Client Application] -->|POST /api/v1/auth/login| AC[Auth Controller]
+  AC -->|401 bad credentials| C
   AC -->|JWT token| C
+
   C -->|POST /api/v1/payments + Bearer token| JF[JWT Auth Filter]
-  JF -->|401 invalid token| C
+  JF -->|401 missing/invalid token| C
   JF -->|authenticated| I[Idempotency Interceptor]
-  I -->|repeat key| IC[(Idempotency Cache)]
-  IC --> C
+
+  I -->|missing key| C
+  I -->|repeat key - Redis hit| RC[(Redis Cache)]
+  RC -->|cached response + status| C
+  I -->|Redis miss - DB hit| DB2[(PostgreSQL)]
+  DB2 -->|cached response + status| C
   I -->|new request| PC[Payment Controller]
+
   PC --> PS[Payment Service]
   PS --> PF[Payment Strategy Factory]
+  PF -->|unsupported provider| EH[Global Exception Handler]
   PF --> SA[Stripe Adapter]
   PF --> PA[PayPal Adapter]
   SA --> PG[(Provider API)]
   PA --> PG
-  PS --> DB[(H2 or PostgreSQL)]
-  PS --> RC[(Redis)]
+  PG -->|provider error| EH
+
+  PS -->|success - cache 200 + body| RC
+  PS -->|success - cache 200 + body| DB[(PostgreSQL)]
+
+  EH -->|422 error body| RBA[Response Caching Advice]
+  RBA -->|cache 422 + exact body| RC
+  RBA -->|cache 422 + exact body| DB
+  EH -->|422 response| C
+  PS -->|200 response| C
 ```
 
 ## Project Evidence For Recruiters
@@ -30,16 +46,19 @@ flowchart LR
 | README.md | Installation guide, architecture view, and feature verification flow. | Technical communication and system design clarity. |
 | DEBUGGING.md | Ledger of production-style root causes and corrective actions. | Structured debugging and resilient problem-solving. |
 | pom.xml | Dependency and plugin management for Spring Boot 3.2 stack. | Strong Java ecosystem and build tooling competence. |
-| postman/ | API collection and environment exports used for endpoint validation. | Practical API testing discipline and coverage mindset. |
+| Dockerfile | Multi-stage Docker image build (Maven build + JRE runtime). | Container-first deployment discipline. |
+| docker-compose.yml | Orchestrates app + PostgreSQL + Redis with health checks. | Production-style infrastructure-as-code. |
+| postman/ | 22-test collection using EP, BVA, and error guessing techniques. | Systematic test design and full API coverage mindset. |
 
 ## Technology Stack
 - Java 17
 - Spring Boot 3.2
 - Spring MVC + WebFlux WebClient
 - Spring Data JPA
-- PostgreSQL (runtime dependency)
-- H2 (local/in-memory development)
-- Redis (idempotency integration point)
+- PostgreSQL (Docker runtime)
+- H2 (local/in-memory development only)
+- Redis (idempotency cache)
+- Docker + Docker Compose
 - Maven
 
 ## Design Patterns
@@ -48,164 +67,116 @@ flowchart LR
 - Adapter Pattern: Provider-specific request/response mapping
 - DTO Pattern: API contract boundaries
 - Builder Pattern: DTO and entity object construction
+- Advisor Pattern: `ResponseBodyAdvice` captures exact serialized error body for idempotency cache consistency
 
 ## Prerequisites
 - Java 17
 - Maven 3.8+
+- Docker Desktop
 
 ## Build and Run
+
+### Docker (recommended)
+```bash
+docker compose up --build
+```
+This starts the Spring Boot app, PostgreSQL, and Redis. The app is available at `http://localhost:8080`.
+
+### Local (H2, no Docker)
 ```bash
 mvn clean install
 mvn spring-boot:run
 ```
 
 ## Feature Highlights
-- JWT authentication with stateless Bearer token validation
-- Multi-tenant payment processing with provider routing strategy
-- Idempotency protection for safe retries on payment requests
-- Validation-first API contract using DTO constraints
-- Centralized exception handling with normalized error responses
-- Adapter-based provider integration for Stripe and PayPal
+- JWT authentication with stateless Bearer token validation; 401 on bad or missing credentials
+- Multi-tenant payment processing with case-insensitive provider routing strategy
+- Idempotency protection: caches both success (200) and error (422) responses with exact byte fidelity — retries receive identical responses including timestamps
+- Validation-first API contract using DTO constraints with normalized error responses
+- Centralized exception handling with structured `errorCode` + `message` + `timestamp` envelope
+- Adapter-based provider integration for Stripe and PayPal with circuit breaker timeout handling
 
-## H2 Console
+## H2 Console (local mode only)
+Only available when running with `mvn spring-boot:run`. Not available in Docker (uses PostgreSQL).
 - URL: http://localhost:8080/h2-console
 - JDBC URL: jdbc:h2:mem:paymentgateway
 - Username: sa
 - Password: (leave blank)
 
-## Postman Export Checklist
-Create and place the following files under the postman folder:
+## Postman Collection
+Import both files from the `postman/` folder:
+- `Multi-Tenant-Payment-Gateway.postman_collection.json`
+- `Multi-Tenant-Payment-Gateway.local.postman_environment.json`
 
-- postman/Multi-Tenant-Payment-Gateway.postman_collection.json
-- postman/Multi-Tenant-Payment-Gateway.local.postman_environment.json
+Select the **Multi-Tenant Payment Gateway - Local** environment before running. Run requests in order — A1 (Login) must run first to populate the `{{token}}` variable.
 
-Recommended saved requests in the collection:
+## API Reference — 22 Postman Verification Tests
 
-- Login (Get JWT Token)
-- Missing Idempotency Header
-- Validation Failure
-- First Successful Payment (Stripe)
-- Idempotency Short-Circuit
-- Unsupported Provider
+### AUTH
 
-## API Reference - 6 Postman Verification Calls
+#### A1 - Login valid credentials
+- `POST /api/v1/auth/login?username=admin&password=admin123`
+- Expected: HTTP 200, `{"token": "<jwt>"}`
 
-### Call 0 - Login (Get JWT Token)
-- Method: POST
-- URL: http://localhost:8080/api/v1/auth/login?username=admin&password=admin123
-- Headers: none
-- Expected:
-  - HTTP 200
-  - Body: `{"token": "<jwt>"}`
-- Note: Copy the token value and use it as `Bearer <token>` in the Authorization header for all subsequent calls.
+#### A2 - Login wrong password (EP: invalid credentials)
+- `POST /api/v1/auth/login?username=admin&password=wrongpass`
+- Expected: HTTP 401
 
-### Call 1 - Missing Idempotency Header
-- Method: POST
-- URL: http://localhost:8080/api/v1/payments
-- Headers: none
-- Body example:
-```json
-{
-  "merchantId": "merchant-any",
-  "amount": 10.00,
-  "currency": "USD",
-  "paymentMethod": "CREDIT_CARD",
-  "targetProvider": "STRIPE",
-  "cardDetails": {
-    "holderName": "John",
-    "token": "tok_test"
-  }
-}
-```
-- Expected:
-  - HTTP 400
-  - Body contains: {"error": "Idempotency-Key header is required"}
+#### A3 - Login unknown user (EP: non-existent user)
+- `POST /api/v1/auth/login?username=ghost&password=anything`
+- Expected: HTTP 401
 
-### Call 2 - Validation Failure
-- Method: POST
-- URL: http://localhost:8080/api/v1/payments
-- Headers:
-  - Idempotency-Key: idem-test-001
-  - Content-Type: application/json
-- Body:
-```json
-{
-  "merchantId": "",
-  "amount": -5.00,
-  "currency": "US",
-  "paymentMethod": "CREDIT_CARD",
-  "targetProvider": "STRIPE",
-  "cardDetails": {
-    "holderName": "John",
-    "token": "tok_test"
-  }
-}
-```
-- Expected:
-  - HTTP 400
-  - errorCode: VALIDATION_ERROR
-  - message lists violated fields
+### SECURITY
 
-### Call 3 - First Successful Payment (Stripe)
-- Method: POST
-- URL: http://localhost:8080/api/v1/payments
-- Headers:
-  - Idempotency-Key: idem-test-002
-  - Content-Type: application/json
-- Body:
-```json
-{
-  "merchantId": "merch_998811",
-  "amount": 250.75,
-  "currency": "USD",
-  "paymentMethod": "CREDIT_CARD",
-  "targetProvider": "STRIPE",
-  "cardDetails": {
-    "holderName": "John Doe",
-    "token": "tok_mock_card_visa"
-  }
-}
-```
-- Expected for fully configured Stripe sandbox:
-  - HTTP 200
-  - GatewayResponseDto with status: SUCCESS
-- Local demo note:
-  - In local/offline mode or with invalid Stripe credentials, this may return a PaymentProcessingException mapped to HTTP 422. That behavior is expected and confirms provider error handling.
+#### S1 - No Authorization header
+- `POST /api/v1/payments` with no `Authorization` header
+- Expected: HTTP 401
 
-### Call 4 - Idempotency Short-Circuit
-- Method: POST
-- URL: http://localhost:8080/api/v1/payments
-- Headers:
-  - Idempotency-Key: idem-test-002
-  - Content-Type: application/json
-- Body:
-  - Use the exact same body as Call 3
-- Expected:
-  - HTTP 200
-  - Response body byte-for-byte identical to Call 3
-  - Served from idempotency cache (interceptor short-circuit)
+#### S2 - Invalid/malformed JWT token
+- `POST /api/v1/payments` with `Authorization: Bearer invalid.jwt.token`
+- Expected: HTTP 401
 
-### Call 5 - Unsupported Provider
-- Method: POST
-- URL: http://localhost:8080/api/v1/payments
-- Headers:
-  - Idempotency-Key: idem-test-003
-  - Content-Type: application/json
-- Body:
-```json
-{
-  "merchantId": "merch_998811",
-  "amount": 250.75,
-  "currency": "USD",
-  "paymentMethod": "CREDIT_CARD",
-  "targetProvider": "UNKNOWN_BANK",
-  "cardDetails": {
-    "holderName": "John Doe",
-    "token": "tok_mock_card_visa"
-  }
-}
-```
-- Expected:
-  - HTTP 422
-  - errorCode: PAYMENT_PROCESSING_ERROR
-  - message contains: Unsupported payment provider: UNKNOWN_BANK
+### IDEMPOTENCY
+
+#### I1 - Missing Idempotency-Key header
+- `POST /api/v1/payments` with no `Idempotency-Key` header
+- Expected: HTTP 400, `{"error": "Idempotency-Key header is required"}`
+
+#### I2 - First payment request (new key)
+- `POST /api/v1/payments` with `Idempotency-Key: idem-test-002`
+- Expected: HTTP 200 or 422 (provider-dependent); response body saved for I3 comparison
+
+#### I3 - Duplicate request (short-circuit cache hit)
+- Same request as I2 with same `Idempotency-Key: idem-test-002`
+- Expected: HTTP status and body byte-for-byte identical to I2, served from cache
+
+### VALIDATION — Boundary Value Analysis
+
+| Test | Field | Input | Expected |
+|------|-------|-------|----------|
+| V1 | merchantId | `""` (blank) | 400 VALIDATION_ERROR |
+| V2 | amount | `0.00` (below min) | 400 VALIDATION_ERROR |
+| V3 | amount | `-1.00` (negative) | 400 VALIDATION_ERROR |
+| V4 | amount | `0.01` (exact min) | 200 or 422 (valid — passes validation) |
+| V5 | currency | `"US"` (2 chars) | 400 VALIDATION_ERROR |
+| V6 | currency | `"USDD"` (4 chars) | 400 VALIDATION_ERROR |
+| V7 | cardDetails | `null` | 400 VALIDATION_ERROR |
+| V8 | cardDetails.holderName | `""` (blank) | 400 VALIDATION_ERROR |
+| V9 | multiple | merchantId blank + amount negative + currency 2 chars | 400 VALIDATION_ERROR, all fields listed |
+
+### PROVIDER ROUTING
+
+#### P1 - Stripe (EP: valid provider)
+- `targetProvider: "STRIPE"` — Expected: HTTP 200 or 422
+
+#### P2 - PayPal (EP: valid provider)
+- `targetProvider: "PAYPAL"` — Expected: HTTP 200 or 422
+
+#### P3 - Lowercase provider name (EP: case-insensitive routing)
+- `targetProvider: "stripe"` — Expected: HTTP 200 or 422 (routing accepts any case)
+
+#### P4 - Unsupported provider (EP: unknown provider)
+- `targetProvider: "UNKNOWN_BANK"` — Expected: HTTP 422, `errorCode: PAYMENT_PROCESSING_ERROR`, message contains `UNKNOWN_BANK`
+
+#### P5 - Empty targetProvider (EP: blank — triggers validation before routing)
+- `targetProvider: ""` — Expected: HTTP 400, `errorCode: VALIDATION_ERROR`
