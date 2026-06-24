@@ -1,0 +1,812 @@
+{
+	"id": "c13e7f5c-5e8c-4de7-8abb-c26edb318a3c",
+	"name": "Multi-Tenant Payment Gateway",
+	"timestamp": "2026-06-24T07:01:46.152Z",
+	"collection_id": "37632869-95a914a7-6d3a-4452-80a2-bc98d6639ddd",
+	"folder_id": 0,
+	"environment_id": "37632869-a2b8199e-6eba-43fd-81e5-8176ccbeab08",
+	"totalPass": 35,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2026-06-24T06:59:29.494Z",
+	"totalFail": 5,
+	"results": [
+		{
+			"id": "03e529c8-9e59-4288-8c3c-0c742b99b7ec",
+			"name": "A1 - Login valid credentials",
+			"url": "http://localhost:8080/api/v1/auth/login?username=admin&password=admin123",
+			"time": 420,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Token is a string": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Token is a string": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				420
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Token is a string": true
+				}
+			]
+		},
+		{
+			"id": "13bf6e7f-3f10-45c6-85b3-18632cbb1eb0",
+			"name": "A2 - Login wrong password (EP: invalid credentials)",
+			"url": "http://localhost:8080/api/v1/auth/login?username=admin&password=wrongpass",
+			"time": 206,
+			"responseCode": {
+				"code": 500,
+				"name": "Internal Server Error"
+			},
+			"tests": {
+				"Status 401 or 403": false
+			},
+			"testPassFailCounts": {
+				"Status 401 or 403": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				206
+			],
+			"allTests": [
+				{
+					"Status 401 or 403": false
+				}
+			]
+		},
+		{
+			"id": "1b2050b0-85b4-4ce3-ad2a-7c21a54075f1",
+			"name": "A3 - Login unknown user (EP: non-existent user)",
+			"url": "http://localhost:8080/api/v1/auth/login?username=ghost&password=anything",
+			"time": 51,
+			"responseCode": {
+				"code": 500,
+				"name": "Internal Server Error"
+			},
+			"tests": {
+				"Status 401 or 403 or 404": false
+			},
+			"testPassFailCounts": {
+				"Status 401 or 403 or 404": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				51
+			],
+			"allTests": [
+				{
+					"Status 401 or 403 or 404": false
+				}
+			]
+		},
+		{
+			"id": "391f8bc5-6a19-4559-a12c-151bf00bf1cb",
+			"name": "S1 - No Authorization header (unauthenticated)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 232,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 401": false
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				232
+			],
+			"allTests": [
+				{
+					"Status 401": false
+				}
+			]
+		},
+		{
+			"id": "942b62a6-5936-4c6d-be6c-882247741509",
+			"name": "S2 - Invalid/malformed JWT token",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 46,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 401": false
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				46
+			],
+			"allTests": [
+				{
+					"Status 401": false
+				}
+			]
+		},
+		{
+			"id": "1fa07aa9-307d-476d-9bb4-83bc5cbbaef2",
+			"name": "I1 - Missing Idempotency-Key header",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 54,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"Error mentions Idempotency-Key": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Error mentions Idempotency-Key": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				54
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"Error mentions Idempotency-Key": true
+				}
+			]
+		},
+		{
+			"id": "61a4e1ad-eb48-4ae9-998f-12348e59c726",
+			"name": "I2 - First payment with idem-key (new request)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 9278,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 200 or 422": true
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				9278
+			],
+			"allTests": [
+				{
+					"Status 200 or 422": true
+				}
+			]
+		},
+		{
+			"id": "f02d91fd-6c32-44d1-8bcb-fd5bae259fc6",
+			"name": "I3 - Duplicate idem-key (short-circuit cache hit)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8282,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status matches Call I2": true,
+				"Response body identical to I2 (idempotency guaranteed)": false
+			},
+			"testPassFailCounts": {
+				"Status matches Call I2": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Response body identical to I2 (idempotency guaranteed)": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				8282
+			],
+			"allTests": [
+				{
+					"Status matches Call I2": true,
+					"Response body identical to I2 (idempotency guaranteed)": false
+				}
+			]
+		},
+		{
+			"id": "c0e5f305-dfea-4c1e-b9d8-0a3f6f59536c",
+			"name": "V1 - Empty merchantId (BVA: blank string)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8080,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true,
+				"merchantId mentioned": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				},
+				"merchantId mentioned": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8080
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true,
+					"merchantId mentioned": true
+				}
+			]
+		},
+		{
+			"id": "c6fbf0cb-bcb7-43e1-8e14-450e379084ec",
+			"name": "V2 - Amount = 0.00 (BVA: below minimum 0.01)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8088,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true,
+				"amount mentioned": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				},
+				"amount mentioned": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8088
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true,
+					"amount mentioned": true
+				}
+			]
+		},
+		{
+			"id": "c5074c4b-6163-4c02-bf60-60a0c8fb6a8e",
+			"name": "V3 - Amount = -1.00 (BVA: negative)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8111,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8111
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true
+				}
+			]
+		},
+		{
+			"id": "7b4818d3-7896-468a-b309-17399deb59c4",
+			"name": "V4 - Amount = 0.01 (BVA: minimum valid amount)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8311,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 200 or 422 (valid amount accepted)": true
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422 (valid amount accepted)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8311
+			],
+			"allTests": [
+				{
+					"Status 200 or 422 (valid amount accepted)": true
+				}
+			]
+		},
+		{
+			"id": "0faee949-a3ee-42f5-ab10-7ff09a79c8d4",
+			"name": "V5 - Currency 2 chars (BVA: below ISO 4217 min length)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8050,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true,
+				"currency mentioned": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				},
+				"currency mentioned": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8050
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true,
+					"currency mentioned": true
+				}
+			]
+		},
+		{
+			"id": "13ec28d1-2911-40e3-ab26-554160174ea6",
+			"name": "V6 - Currency 4 chars (BVA: above ISO 4217 max length)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8054,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8054
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true
+				}
+			]
+		},
+		{
+			"id": "5328a12e-301f-4e2e-b9ae-7f67f69d3a7f",
+			"name": "V7 - Missing cardDetails (EP: null nested object)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8202,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8202
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true
+				}
+			]
+		},
+		{
+			"id": "ec77d6bb-03bd-49fd-8558-b71cb3f69def",
+			"name": "V8 - Blank cardDetails.holderName (EP: blank nested field)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8056,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8056
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true
+				}
+			]
+		},
+		{
+			"id": "5600c6c1-704d-4510-9efb-76de37123210",
+			"name": "V9 - Multiple violations at once (EP: combined invalid fields)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8044,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true,
+				"Multiple fields in message": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Multiple fields in message": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8044
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true,
+					"Multiple fields in message": true
+				}
+			]
+		},
+		{
+			"id": "4a9ba6e5-1f05-4dc9-9f0e-b43d7283a1cc",
+			"name": "P1 - Stripe provider (EP: valid provider)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8304,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 200 or 422 (routed to Stripe)": true
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422 (routed to Stripe)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8304
+			],
+			"allTests": [
+				{
+					"Status 200 or 422 (routed to Stripe)": true
+				}
+			]
+		},
+		{
+			"id": "0a7c83cf-2e43-4f74-a028-10553c2dbe01",
+			"name": "P2 - PayPal provider (EP: valid provider)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 9926,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 200 or 422 (routed to PayPal)": true
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422 (routed to PayPal)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				9926
+			],
+			"allTests": [
+				{
+					"Status 200 or 422 (routed to PayPal)": true
+				}
+			]
+		},
+		{
+			"id": "8c6cf1f6-df6b-4dc1-a775-43200222d56c",
+			"name": "P3 - Case-insensitive provider name (EP: lowercase stripe)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8257,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 200 or 422 (case-insensitive routing accepted)": true
+			},
+			"testPassFailCounts": {
+				"Status 200 or 422 (case-insensitive routing accepted)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8257
+			],
+			"allTests": [
+				{
+					"Status 200 or 422 (case-insensitive routing accepted)": true
+				}
+			]
+		},
+		{
+			"id": "afe3b000-ffda-474d-b7cc-aa2760b2472e",
+			"name": "P4 - Unsupported provider (EP: unknown provider)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8043,
+			"responseCode": {
+				"code": 422,
+				"name": "Unprocessable Entity (WebDAV) (RFC 4918)"
+			},
+			"tests": {
+				"Status 422": true,
+				"errorCode PAYMENT_PROCESSING_ERROR": true,
+				"message mentions UNKNOWN_BANK": true
+			},
+			"testPassFailCounts": {
+				"Status 422": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode PAYMENT_PROCESSING_ERROR": {
+					"pass": 1,
+					"fail": 0
+				},
+				"message mentions UNKNOWN_BANK": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8043
+			],
+			"allTests": [
+				{
+					"Status 422": true,
+					"errorCode PAYMENT_PROCESSING_ERROR": true,
+					"message mentions UNKNOWN_BANK": true
+				}
+			]
+		},
+		{
+			"id": "f61db0dd-4857-4cbf-9eab-c56be872d430",
+			"name": "P5 - Empty targetProvider (EP: blank provider, triggers validation)",
+			"url": "http://localhost:8080/api/v1/payments",
+			"time": 8046,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true,
+				"errorCode VALIDATION_ERROR": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				},
+				"errorCode VALIDATION_ERROR": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8046
+			],
+			"allTests": [
+				{
+					"Status 400": true,
+					"errorCode VALIDATION_ERROR": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 134141,
+	"collection": {
+		"requests": [
+			{
+				"id": "03e529c8-9e59-4288-8c3c-0c742b99b7ec",
+				"method": "POST"
+			},
+			{
+				"id": "13bf6e7f-3f10-45c6-85b3-18632cbb1eb0",
+				"method": "POST"
+			},
+			{
+				"id": "1b2050b0-85b4-4ce3-ad2a-7c21a54075f1",
+				"method": "POST"
+			},
+			{
+				"id": "391f8bc5-6a19-4559-a12c-151bf00bf1cb",
+				"method": "POST"
+			},
+			{
+				"id": "942b62a6-5936-4c6d-be6c-882247741509",
+				"method": "POST"
+			},
+			{
+				"id": "1fa07aa9-307d-476d-9bb4-83bc5cbbaef2",
+				"method": "POST"
+			},
+			{
+				"id": "61a4e1ad-eb48-4ae9-998f-12348e59c726",
+				"method": "POST"
+			},
+			{
+				"id": "f02d91fd-6c32-44d1-8bcb-fd5bae259fc6",
+				"method": "POST"
+			},
+			{
+				"id": "c0e5f305-dfea-4c1e-b9d8-0a3f6f59536c",
+				"method": "POST"
+			},
+			{
+				"id": "c6fbf0cb-bcb7-43e1-8e14-450e379084ec",
+				"method": "POST"
+			},
+			{
+				"id": "c5074c4b-6163-4c02-bf60-60a0c8fb6a8e",
+				"method": "POST"
+			},
+			{
+				"id": "7b4818d3-7896-468a-b309-17399deb59c4",
+				"method": "POST"
+			},
+			{
+				"id": "0faee949-a3ee-42f5-ab10-7ff09a79c8d4",
+				"method": "POST"
+			},
+			{
+				"id": "13ec28d1-2911-40e3-ab26-554160174ea6",
+				"method": "POST"
+			},
+			{
+				"id": "5328a12e-301f-4e2e-b9ae-7f67f69d3a7f",
+				"method": "POST"
+			},
+			{
+				"id": "ec77d6bb-03bd-49fd-8558-b71cb3f69def",
+				"method": "POST"
+			},
+			{
+				"id": "5600c6c1-704d-4510-9efb-76de37123210",
+				"method": "POST"
+			},
+			{
+				"id": "4a9ba6e5-1f05-4dc9-9f0e-b43d7283a1cc",
+				"method": "POST"
+			},
+			{
+				"id": "0a7c83cf-2e43-4f74-a028-10553c2dbe01",
+				"method": "POST"
+			},
+			{
+				"id": "8c6cf1f6-df6b-4dc1-a775-43200222d56c",
+				"method": "POST"
+			},
+			{
+				"id": "afe3b000-ffda-474d-b7cc-aa2760b2472e",
+				"method": "POST"
+			},
+			{
+				"id": "f61db0dd-4857-4cbf-9eab-c56be872d430",
+				"method": "POST"
+			}
+		]
+	}
+}
