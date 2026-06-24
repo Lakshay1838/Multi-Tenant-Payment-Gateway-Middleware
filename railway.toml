@@ -3,7 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "java -jar /app/app.jar"
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 120
 restartPolicyType = "on_failure"
